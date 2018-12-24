@@ -44,6 +44,7 @@ htmlcov
 
 # JetBrains
 .idea
+*.iml
 
 # VSCode
 .vscode
