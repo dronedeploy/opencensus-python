@@ -21,6 +21,7 @@ from opencensus.trace import execution_context, attributes_helper
 from opencensus.trace import span as span_module
 from opencensus.trace import tracer as tracer_module
 from opencensus.trace.ext.tornado.stack_context import tracer_stack_context
+from opencensus.trace.ext.utils import get_func_name
 
 log = logging.getLogger(__name__)
 
@@ -99,10 +100,11 @@ def _execute(func, handler, args, kwargs):
 
     with tracer_stack_context():
         span = tracer.start_span()
+        span.name = '[{}]{}'.format(_get_class_name(handler), handler.request.method)
         span.span_kind = span_module.SpanKind.SERVER
-        # tracer.add_attribute_to_current_span(
-        #    attribute_key=HTTP_METHOD,
-        #    attribute_value=handler.request.method)
+        tracer.add_attribute_to_current_span(
+            attribute_key=HTTP_METHOD,
+            attribute_value=handler.request.method)
         tracer.add_attribute_to_current_span(
             attribute_key=HTTP_URL,
             attribute_value=handler.request.uri)
@@ -139,3 +141,13 @@ def _log_exception(func, handler, args, kwargs):
         execution_context.set_opencensus_attr(TORNADO_EXCEPTION, True)
 
     return func(*args, **kwargs)
+
+
+def _get_class_name(obj):
+    """Return a name which includes the module name and class name."""
+    class_name = getattr(obj, '__name__', obj.__class__.__name__)
+    module_name = obj.__module__
+
+    if module_name is not None:
+        return '{}.{}'.format(module_name, class_name)
+    return class_name
