@@ -14,6 +14,7 @@
 import importlib
 import logging
 
+import six
 import wrapt
 from tornado.web import HTTPError
 
@@ -21,7 +22,6 @@ from opencensus.trace import execution_context, attributes_helper
 from opencensus.trace import span as span_module
 from opencensus.trace import tracer as tracer_module
 from opencensus.trace.ext.tornado.stack_context import tracer_stack_context
-from opencensus.trace.ext.utils import get_func_name
 
 log = logging.getLogger(__name__)
 
@@ -61,11 +61,17 @@ def _init(__init__, app, args, kwargs):
     __init__(*args, **kwargs)
     config = app.settings.get(CONFIG_KEY, DEFAULT_TORNADO_TRACER_CONFIG)
     processed_config = {
-        PROPAGATOR_KEY: _convert_to_import(config[PROPAGATOR_KEY])(),
-        EXPORTER_KEY: _convert_to_import(config[EXPORTER_KEY])(),
-        SAMPLER_KEY: _convert_to_import(config[SAMPLER_KEY])()
+        PROPAGATOR_KEY: _obj_or_import(config[PROPAGATOR_KEY]),
+        EXPORTER_KEY: _obj_or_import(config[EXPORTER_KEY]),
+        SAMPLER_KEY: _obj_or_import(config[SAMPLER_KEY]),
     }
     app.settings[CONFIG_KEY] = processed_config
+
+
+def _obj_or_import(obj):
+    """If the the config value is a string, then instantiate it as a class otherwise just return the object
+    """
+    return _convert_to_import(obj)() if isinstance(obj, six.string_types) else obj
 
 
 def _convert_to_import(path):
