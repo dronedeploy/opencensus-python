@@ -6,32 +6,14 @@ from tornado.httpclient import HTTPRequest
 from opencensus.trace import config_integration, attributes_helper
 from opencensus.trace import span as span_module
 from opencensus.trace import tracer as tracer_module
-from opencensus.trace.exporters.base import Exporter
+from opencensus.trace.exporters.capturing_exporter import CapturingExporter
 from opencensus.trace.ext.tornado.stack_context import tracer_stack_context
 from opencensus.trace.propagation.google_cloud_format import GoogleCloudFormatPropagator
 from opencensus.trace.samplers import AlwaysOnSampler
 
-
 HTTP_METHOD = attributes_helper.COMMON_ATTRIBUTES['HTTP_METHOD']
 HTTP_URL = attributes_helper.COMMON_ATTRIBUTES['HTTP_URL']
 HTTP_STATUS_CODE = attributes_helper.COMMON_ATTRIBUTES['HTTP_STATUS_CODE']
-
-
-class CapturingExporter(Exporter):
-
-    def __init__(self):
-        super(CapturingExporter, self).__init__()
-        self._spans = []
-
-    @property
-    def spans(self):
-        return self._spans
-
-    def emit(self, span_datas):
-        pass
-
-    def export(self, span_datas):
-        self._spans.append(span_datas)
 
 
 class MainHandler(tornado.web.RequestHandler):

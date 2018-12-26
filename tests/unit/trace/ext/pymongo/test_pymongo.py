@@ -1,33 +1,14 @@
-import time
-
 import pymongo
 import pytest
 
 from opencensus.trace import config_integration
 from opencensus.trace import tracer as tracer_module
-from opencensus.trace.exporters.base import Exporter
+from opencensus.trace.exporters.capturing_exporter import CapturingExporter
 from opencensus.trace.ext.pymongo.trace import _normalize_filter
 from opencensus.trace.propagation.google_cloud_format import GoogleCloudFormatPropagator
 from opencensus.trace.samplers import AlwaysOnSampler
 
 config_integration.trace_integrations(['pymongo'])
-
-
-class CapturingExporter(Exporter):
-
-    def __init__(self):
-        super(CapturingExporter, self).__init__()
-        self._spans = []
-
-    @property
-    def spans(self):
-        return self._spans
-
-    def emit(self, span_datas):
-        pass
-
-    def export(self, span_datas):
-        self._spans.append(span_datas)
 
 
 @pytest.fixture(autouse=True)
