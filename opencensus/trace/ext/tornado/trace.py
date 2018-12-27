@@ -123,8 +123,7 @@ def _on_finish(func, handler, args, kwargs):
         return
 
     tracer = execution_context.get_opencensus_tracer()
-    span = execution_context.get_current_span()
-    span.add_attribute(
+    tracer.add_attribute_to_current_span(
         attribute_key=HTTP_STATUS_CODE,
         attribute_value=str(handler.get_status()))
     tracer.finish()
@@ -138,8 +137,7 @@ def _log_exception(func, handler, args, kwargs):
 
     tracer = execution_context.get_opencensus_tracer()
     if not isinstance(value, HTTPError) or 500 <= value.status_code <= 599:
-        span = execution_context.get_current_span()
-        span.add_attribute(
+        tracer.add_attribute_to_current_span(
             attribute_key=HTTP_STATUS_CODE,
             attribute_value=str(handler.get_status()))
         tracer.finish()
