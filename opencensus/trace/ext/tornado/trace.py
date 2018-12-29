@@ -21,7 +21,9 @@ from tornado.web import HTTPError
 from opencensus.trace import execution_context, attributes_helper
 from opencensus.trace import span as span_module
 from opencensus.trace import tracer as tracer_module
+from opencensus.trace.ext import utils
 from opencensus.trace.ext.tornado.stack_context import tracer_stack_context
+from opencensus.trace.ext.utils import DEFAULT_BLACKLIST_PATHS
 
 log = logging.getLogger(__name__)
 
@@ -29,11 +31,13 @@ CONFIG_KEY = 'opencensus.tracer'
 SAMPLER_KEY = 'opencensus.tracer.SAMPLER'
 EXPORTER_KEY = 'opencensus.tracer.EXPORTER'
 PROPAGATOR_KEY = 'opencensus.tracer.PROPAGATOR'
+BLACKLIST_PATHS = 'opencensus.tracer.ext.BLACKLIST_PATHS'
 
 DEFAULT_TORNADO_TRACER_CONFIG = {
     SAMPLER_KEY: 'opencensus.trace.samplers.always_on.AlwaysOnSampler',
     EXPORTER_KEY: 'opencensus.trace.exporters.print_exporter.PrintExporter',
     PROPAGATOR_KEY: 'opencensus.trace.propagation.google_cloud_format.GoogleCloudFormatPropagator',
+    BLACKLIST_PATHS: DEFAULT_BLACKLIST_PATHS,
 }
 
 HTTP_METHOD = attributes_helper.COMMON_ATTRIBUTES['HTTP_METHOD']
@@ -64,6 +68,7 @@ def _init(__init__, app, args, kwargs):
         PROPAGATOR_KEY: _obj_or_import(config[PROPAGATOR_KEY]),
         EXPORTER_KEY: _obj_or_import(config[EXPORTER_KEY]),
         SAMPLER_KEY: _obj_or_import(config[SAMPLER_KEY]),
+        BLACKLIST_PATHS: config[BLACKLIST_PATHS],
     }
     app.settings[CONFIG_KEY] = processed_config
 
@@ -92,7 +97,8 @@ def _convert_to_import(path):
 
 def _execute(func, handler, args, kwargs):
     config = handler.settings.get(CONFIG_KEY, None)
-    if not config:
+    if not config or utils.disable_tracing_url(handler.request.path, config[BLACKLIST_PATHS]):
+        setattr(handler.request, '_opencensus_trace_enabled', False)
         return func(*args, **kwargs)
 
     propagator = config[PROPAGATOR_KEY]
@@ -105,6 +111,7 @@ def _execute(func, handler, args, kwargs):
         propagator=propagator)
 
     with tracer_stack_context():
+        setattr(handler.request, '_opencensus_trace_enabled', True)
         span = tracer.start_span()
         span.name = '[{}]{}'.format(_get_class_name(handler), handler.request.method)
         span.span_kind = span_module.SpanKind.SERVER
@@ -113,14 +120,17 @@ def _execute(func, handler, args, kwargs):
             attribute_value=handler.request.method)
         tracer.add_attribute_to_current_span(
             attribute_key=HTTP_URL,
-            attribute_value=handler.request.uri)
+            attribute_value=handler.request.path)
 
         return func(*args, **kwargs)
 
 
 def _on_finish(func, handler, args, kwargs):
     if execution_context.get_opencensus_attr(TORNADO_EXCEPTION) is not None:
-        return
+        return func(*args, **kwargs)
+
+    if not getattr(handler.request, '_opencensus_trace_enabled'):
+        return func(*args, **kwargs)
 
     tracer = execution_context.get_opencensus_tracer()
     tracer.add_attribute_to_current_span(
@@ -133,6 +143,9 @@ def _on_finish(func, handler, args, kwargs):
 def _log_exception(func, handler, args, kwargs):
     value = args[1] if len(args) == 3 else None
     if value is None:
+        return func(*args, **kwargs)
+
+    if not getattr(handler.request, '_opencensus_trace_enabled'):
         return func(*args, **kwargs)
 
     tracer = execution_context.get_opencensus_tracer()

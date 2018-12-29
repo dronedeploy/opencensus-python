@@ -6,6 +6,8 @@ from tornado.concurrent import run_on_executor
 from tornado.httpclient import HTTPClientError
 
 from opencensus.trace import execution_context as ec, config_integration
+from opencensus.trace.exporters.capturing_exporter import CapturingExporter
+from opencensus.trace.ext.tornado.trace import DEFAULT_TORNADO_TRACER_CONFIG, BLACKLIST_PATHS, EXPORTER_KEY, CONFIG_KEY
 
 
 config_integration.trace_integrations(['tornado'])
@@ -14,6 +16,12 @@ config_integration.trace_integrations(['tornado'])
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.write('{}')
+
+
+class BlacklistHandler(tornado.web.RequestHandler):
+    def get(self):
+        span = ec.get_current_span()
+        assert span is None
 
 
 class ErrorHandler(tornado.web.RequestHandler):
@@ -57,41 +65,68 @@ class ThreadPoolHandler(tornado.web.RequestHandler):
         assert ec.get_current_span() is span
         self.write('{}')
 
+
 @pytest.fixture
-def app():
-    settings = {}
+def app(exporter):
+    trace_settings = DEFAULT_TORNADO_TRACER_CONFIG.copy()
+    trace_settings[BLACKLIST_PATHS] = ['blacklisted']
+    trace_settings[EXPORTER_KEY] = exporter
+
+    settings = {
+        CONFIG_KEY: trace_settings
+    }
     app = tornado.web.Application(
         [
             ('/', MainHandler),
             ('/error', ErrorHandler),
             ('/coroutine', ScopeHandler),
             ('/threadpool', ThreadPoolHandler),
+            ('/blacklisted', MainHandler),
         ],
         **settings
     )
     return app
 
 
+@pytest.fixture(autouse=True)
+def exporter():
+    exporter = CapturingExporter()
+    return exporter
+
+
 @pytest.mark.gen_test
-def test_hello_world(http_client, base_url):
+def test_hello_world(http_client, base_url, exporter):
     response = yield http_client.fetch(base_url)
     assert response.code == 200
+    assert 1 == len(exporter.spans)
 
 
 @pytest.mark.gen_test
-def test_coroutine(http_client, base_url):
+def test_coroutine(http_client, base_url, exporter):
     response = yield http_client.fetch(base_url + '/coroutine')
     assert response.code == 200
+    assert 2 == len(exporter.spans)
+    assert 'child' == exporter.spans[0][0].name
+    assert exporter.spans[1][0].span_id == exporter.spans[0][0].parent_span_id
 
 
 @pytest.mark.gen_test
-def test_threadpool(http_client, base_url):
+def test_threadpool(http_client, base_url, exporter):
     response = yield http_client.fetch(base_url + '/threadpool')
     assert response.code == 200
+    assert 1 == len(exporter.spans)
 
 
 @pytest.mark.gen_test
-def test_error(http_client, base_url):
+def test_error(http_client, base_url, exporter):
     with pytest.raises(HTTPClientError) as e:
         yield http_client.fetch(base_url + '/error')
     assert e.value.code == 500
+    assert 1 == len(exporter.spans)
+
+
+@pytest.mark.gen_test
+def test_blacklist(http_client, base_url, exporter):
+    response = yield http_client.fetch(base_url + '/blacklisted')
+    assert response.code == 200
+    assert 0 == len(exporter.spans)
