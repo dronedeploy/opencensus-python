@@ -1,15 +1,15 @@
 from bson.son import SON
 
-from opencensus.trace.ext.pymongo.parse import parse_spec
+from opencensus.trace.ext.pymongo.trace import _parse_spec
 
 
 def test_empty():
-    cmd = parse_spec(SON([]))
+    cmd = _parse_spec(SON([]))
     assert cmd is None
 
 
 def test_create():
-    cmd = parse_spec(SON([('create', 'foo')]))
+    cmd = _parse_spec(SON([('create', 'foo')]))
     eq_(cmd.name, 'create')
     eq_(cmd.coll, 'foo')
     eq_(cmd.tags, {})
@@ -22,7 +22,7 @@ def test_insert():
         ('ordered', True),
         ('documents', ['a', 'b']),
     ])
-    cmd = parse_spec(spec)
+    cmd = _parse_spec(spec)
     eq_(cmd.name, 'insert')
     eq_(cmd.coll, 'bla')
     eq_(cmd.tags, {'mongodb.ordered': True})
@@ -42,7 +42,7 @@ def test_update():
             ])
         ])
     ])
-    cmd = parse_spec(spec)
+    cmd = _parse_spec(spec)
     eq_(cmd.name, 'update')
     eq_(cmd.coll, 'songs')
     eq_(cmd.query, {'artist': 'Neil'})
