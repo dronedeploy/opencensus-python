@@ -27,7 +27,36 @@ MODULE_NAME = 'redis'
 def trace_integration(tracer=None):
     """Wrap the pymongo connection to trace it."""
     log.info('Integrated module: {}'.format(MODULE_NAME))
-    _patch_redis_classes()
+    patch_redis_classes(redis.StrictRedis)
+
+
+def patch_redis_classes(client, trace_pipeline=True, trace_pubsub=True):
+    # Patch the outgoing commands.
+    _patch_obj_execute_command(client, True)
+
+    # Patch the created pipelines.
+    if trace_pipeline:
+        pipeline_method = client.pipeline
+
+        @wraps(pipeline_method)
+        def tracing_pipeline(self, transaction=True, shard_hint=None):
+            pipe = pipeline_method(self, transaction, shard_hint)
+            _patch_pipe_execute(pipe)
+            return pipe
+
+        client.pipeline = tracing_pipeline
+
+    if trace_pubsub:
+        # Patch the created pubsubs.
+        pubsub_method = client.pubsub
+
+        @wraps(pubsub_method)
+        def tracing_pubsub(self, **kwargs):
+            pubsub = pubsub_method(self, **kwargs)
+            _patch_pubsub(pubsub)
+            return pubsub
+
+        client.pubsub = tracing_pubsub
 
 
 def _normalize_stmt(args):
@@ -42,33 +71,6 @@ def _normalize_stmts(command_stack):
 def _set_base_span_tags(span, stmt):
     span.span_kind = span_module.SpanKind.CLIENT
     span.add_attribute('{}.statement'.format(MODULE_NAME), stmt)
-
-
-def _patch_redis_classes():
-    # Patch the outgoing commands.
-    _patch_obj_execute_command(redis.StrictRedis, True)
-
-    # Patch the created pipelines.
-    pipeline_method = redis.StrictRedis.pipeline
-
-    @wraps(pipeline_method)
-    def tracing_pipeline(self, transaction=True, shard_hint=None):
-        pipe = pipeline_method(self, transaction, shard_hint)
-        _patch_pipe_execute(pipe)
-        return pipe
-
-    redis.StrictRedis.pipeline = tracing_pipeline
-
-    # Patch the created pubsubs.
-    pubsub_method = redis.StrictRedis.pubsub
-
-    @wraps(pubsub_method)
-    def tracing_pubsub(self, **kwargs):
-        pubsub = pubsub_method(self, **kwargs)
-        _patch_pubsub(pubsub)
-        return pubsub
-
-    redis.StrictRedis.pubsub = tracing_pubsub
 
 
 def _patch_client(client):
