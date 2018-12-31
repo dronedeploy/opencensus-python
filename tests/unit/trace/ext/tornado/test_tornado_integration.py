@@ -3,7 +3,6 @@ import tornado
 from concurrent import futures
 from tornado import web
 from tornado.concurrent import run_on_executor
-from tornado.httpclient import HTTPClientError
 
 from opencensus.trace import execution_context as ec, config_integration
 from opencensus.trace.exporters.capturing_exporter import CapturingExporter
@@ -119,7 +118,7 @@ def test_threadpool(http_client, base_url, exporter):
 
 @pytest.mark.gen_test
 def test_error(http_client, base_url, exporter):
-    with pytest.raises(HTTPClientError) as e:
+    with pytest.raises(BaseException) as e:
         yield http_client.fetch(base_url + '/error')
     assert e.value.code == 500
     assert 1 == len(exporter.spans)

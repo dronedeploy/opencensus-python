@@ -18,11 +18,11 @@ import six
 import wrapt
 from tornado.web import HTTPError
 
-from opencensus.trace import execution_context, attributes_helper
+from opencensus.trace import attributes_helper, execution_context
 from opencensus.trace import span as span_module
 from opencensus.trace import tracer as tracer_module
 from opencensus.trace.ext import utils
-from opencensus.trace.ext.tornado.stack_context import tracer_stack_context
+from opencensus.trace.ext.tornado.stack_context import tracer_stack_context, _TracerRequestContextManager
 from opencensus.trace.ext.utils import DEFAULT_BLACKLIST_PATHS
 
 log = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ HTTP_METHOD = attributes_helper.COMMON_ATTRIBUTES['HTTP_METHOD']
 HTTP_URL = attributes_helper.COMMON_ATTRIBUTES['HTTP_URL']
 HTTP_STATUS_CODE = attributes_helper.COMMON_ATTRIBUTES['HTTP_STATUS_CODE']
 
-TORNADO_EXCEPTION = "opecensus.trace.ext.tornado.request_exception"
+TRACER = "opencensus.trace.ext.tornado.Tracer"
 
 MODULE_NAME = 'tornado.web'
 
@@ -59,6 +59,17 @@ def trace_tornado():
     wrapt.wrap_function_wrapper(MODULE_NAME, 'RequestHandler._execute', _execute)
     wrapt.wrap_function_wrapper(MODULE_NAME, 'RequestHandler.on_finish', _on_finish)
     wrapt.wrap_function_wrapper(MODULE_NAME, 'RequestHandler.log_exception', _log_exception)
+
+    # We need to replace OpenCensus' default execution context with variables that can be managed via
+    # Tornado's StackContext as opposed to a thread local
+    setattr(execution_context, '_get_context', _get_context)
+
+
+def _get_context():
+    context = _TracerRequestContextManager.current_context()
+    if context is None:
+        return execution_context._thread_local
+    return context
 
 
 def _init(__init__, app, args, kwargs):
@@ -98,20 +109,19 @@ def _convert_to_import(path):
 def _execute(func, handler, args, kwargs):
     config = handler.settings.get(CONFIG_KEY, None)
     if not config or utils.disable_tracing_url(handler.request.path, config[BLACKLIST_PATHS]):
-        setattr(handler.request, '_opencensus_trace_enabled', False)
         return func(*args, **kwargs)
 
-    propagator = config[PROPAGATOR_KEY]
-    span_context = propagator.from_headers(handler.request.headers)
-
-    tracer = tracer_module.Tracer(
-        span_context=span_context,
-        sampler=config[SAMPLER_KEY],
-        exporter=config[EXPORTER_KEY],
-        propagator=propagator)
-
     with tracer_stack_context():
-        setattr(handler.request, '_opencensus_trace_enabled', True)
+        propagator = config[PROPAGATOR_KEY]
+        span_context = propagator.from_headers(handler.request.headers)
+
+        tracer = tracer_module.Tracer(
+            span_context=span_context,
+            sampler=config[SAMPLER_KEY],
+            exporter=config[EXPORTER_KEY],
+            propagator=propagator)
+
+        setattr(handler.request, TRACER, tracer)
         span = tracer.start_span()
         span.name = '[{}]{}'.format(_get_class_name(handler), handler.request.method)
         span.span_kind = span_module.SpanKind.SERVER
@@ -126,13 +136,12 @@ def _execute(func, handler, args, kwargs):
 
 
 def _on_finish(func, handler, args, kwargs):
-    if execution_context.get_opencensus_attr(TORNADO_EXCEPTION) is not None:
+    tracer = getattr(handler.request, TRACER, None)
+    if not tracer:
         return func(*args, **kwargs)
 
-    if not getattr(handler.request, '_opencensus_trace_enabled'):
-        return func(*args, **kwargs)
+    delattr(handler.request, TRACER)
 
-    tracer = execution_context.get_opencensus_tracer()
     tracer.add_attribute_to_current_span(
         attribute_key=HTTP_STATUS_CODE,
         attribute_value=str(handler.get_status()))
@@ -145,17 +154,17 @@ def _log_exception(func, handler, args, kwargs):
     if value is None:
         return func(*args, **kwargs)
 
-    if not getattr(handler.request, '_opencensus_trace_enabled'):
+    tracer = getattr(handler.request, TRACER, None)
+    if not tracer:
         return func(*args, **kwargs)
 
-    tracer = execution_context.get_opencensus_tracer()
+    delattr(handler.request, TRACER)
+
     if not isinstance(value, HTTPError) or 500 <= value.status_code <= 599:
         tracer.add_attribute_to_current_span(
             attribute_key=HTTP_STATUS_CODE,
             attribute_value=str(handler.get_status()))
         tracer.finish()
-
-        execution_context.set_opencensus_attr(TORNADO_EXCEPTION, True)
 
     return func(*args, **kwargs)
 

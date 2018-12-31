@@ -72,10 +72,7 @@ class ThreadSafeStackContext(stack_context.StackContext):
 
 
 class _TracerRequestContext(object):
-    __slots__ = ('active', )
-
-    def __init__(self, active=None):
-        self.active = active
+    __slots__ = ('attrs', 'current_span', 'tracer',)
 
 
 class _TracerRequestContextManager(object):
