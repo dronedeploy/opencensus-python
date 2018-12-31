@@ -24,6 +24,7 @@ from opencensus.trace import tracer as tracer_module
 from opencensus.trace.ext import utils
 from opencensus.trace.ext.tornado.stack_context import tracer_stack_context, _TracerRequestContextManager
 from opencensus.trace.ext.utils import DEFAULT_BLACKLIST_PATHS
+from opencensus.trace.tracers.noop_tracer import NoopTracer
 
 log = logging.getLogger(__name__)
 
@@ -107,11 +108,13 @@ def _convert_to_import(path):
 
 
 def _execute(func, handler, args, kwargs):
-    config = handler.settings.get(CONFIG_KEY, None)
-    if not config or utils.disable_tracing_url(handler.request.path, config[BLACKLIST_PATHS]):
-        return func(*args, **kwargs)
-
     with tracer_stack_context():
+        config = handler.settings.get(CONFIG_KEY, None)
+        if not config or utils.disable_tracing_url(handler.request.path, config[BLACKLIST_PATHS]):
+            tracer = NoopTracer()
+            setattr(handler.request, TRACER, tracer)
+            return func(*args, **kwargs)
+
         propagator = config[PROPAGATOR_KEY]
         span_context = propagator.from_headers(handler.request.headers)
 
