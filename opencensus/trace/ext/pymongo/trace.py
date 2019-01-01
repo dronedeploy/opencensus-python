@@ -35,7 +35,7 @@ class CommandTracer(monitoring.CommandListener):
 
     def started(self, event):
         tracer = execution_context.get_opencensus_tracer()
-        span = tracer.start_span('{}.cmd'.format(MODULE_NAME))
+        span = tracer.start_span('{}.{}'.format(event.command_name, MODULE_NAME))
         span.span_kind = span_module.SpanKind.CLIENT
         tracer.add_attribute_to_current_span('{}.db'.format(MODULE_NAME), event.database_name)
         _set_query_metadata(event)
@@ -53,6 +53,9 @@ class CommandTracer(monitoring.CommandListener):
 def _set_query_metadata(event):
     tracer = execution_context.get_opencensus_tracer()
     name, db, coll, query = _parse_spec(event.command)
+    if not coll:
+        return
+
     tracer.add_attribute_to_current_span('{}.collection'.format(MODULE_NAME), coll)
     if query:
         nq = _normalize_filter(query)
@@ -67,9 +70,13 @@ def _parse_spec(spec, db=None):
     """ Return a Command that has parsed the relevant detail for the given
         pymongo SON spec.
     """
-    items = list(spec.items())
+    try:
+        items = list(spec.items())
+    except TypeError:
+        return None, None, None, None
+
     if not items:
-        return None
+        return None, None, None, None
     name, coll = items[0]
 
     query = None
