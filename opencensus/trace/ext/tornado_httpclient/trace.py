@@ -19,7 +19,6 @@ from tornado.httpclient import HTTPRequest, HTTPError
 
 from opencensus.trace import execution_context, attributes_helper
 from opencensus.trace import span as span_module
-from opencensus.trace.ext.tornado.trace import _get_context
 
 log = logging.getLogger(__name__)
 
@@ -33,10 +32,6 @@ HTTP_STATUS_CODE = attributes_helper.COMMON_ATTRIBUTES['HTTP_STATUS_CODE']
 
 def trace_integration(tracer=None):
     log.info('Integrated module: {}'.format(MODULE_NAME))
-
-    # We need to replace OpenCensus' default execution context with variables that can be managed via
-    # Tornado's StackContext as opposed to a thread local
-    setattr(execution_context, '_get_context', _get_context)
 
     if tracer is not None:
         # The execution_context tracer should never be None - if it has not

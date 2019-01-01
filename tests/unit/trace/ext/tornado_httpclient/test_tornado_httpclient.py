@@ -16,6 +16,9 @@ HTTP_URL = attributes_helper.COMMON_ATTRIBUTES['HTTP_URL']
 HTTP_STATUS_CODE = attributes_helper.COMMON_ATTRIBUTES['HTTP_STATUS_CODE']
 
 
+config_integration.trace_integrations(['tornado_httpclient'])
+
+
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.write('{}')
@@ -51,8 +54,6 @@ class TestClient(tornado.testing.AsyncHTTPTestCase):
             exporter=self.exporter,
             propagator=GoogleCloudFormatPropagator()
         )
-
-        config_integration.trace_integrations(['tornado_httpclient'], tracer=self.tracer)
 
         self.stack_context = tracer_stack_context()
         self.stack_context.__enter__()
