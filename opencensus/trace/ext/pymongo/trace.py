@@ -35,7 +35,7 @@ class CommandTracer(monitoring.CommandListener):
 
     def started(self, event):
         tracer = execution_context.get_opencensus_tracer()
-        span = tracer.start_span('{}.{}'.format(event.command_name, MODULE_NAME))
+        span = tracer.start_span('{}.{}'.format(MODULE_NAME, event.command_name))
         span.span_kind = span_module.SpanKind.CLIENT
         tracer.add_attribute_to_current_span('{}.db'.format(MODULE_NAME), event.database_name)
         _set_query_metadata(event)
