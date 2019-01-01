@@ -34,6 +34,10 @@ HTTP_STATUS_CODE = attributes_helper.COMMON_ATTRIBUTES['HTTP_STATUS_CODE']
 def trace_integration(tracer=None):
     log.info('Integrated module: {}'.format(MODULE_NAME))
 
+    # We need to replace OpenCensus' default execution context with variables that can be managed via
+    # Tornado's StackContext as opposed to a thread local
+    setattr(execution_context, '_get_context', _get_context)
+
     if tracer is not None:
         # The execution_context tracer should never be None - if it has not
         # been set it returns a no-op tracer. Most code in this library does
@@ -45,10 +49,6 @@ def trace_integration(tracer=None):
 
 def trace_tornado_httpclient():
     wrapt.wrap_function_wrapper('tornado.httpclient', 'AsyncHTTPClient.fetch', _fetch_async)
-
-    # We need to replace OpenCensus' default execution context with variables that can be managed via
-    # Tornado's StackContext as opposed to a thread local
-    setattr(execution_context, '_get_context', _get_context)
 
 
 def _normalize_request(args, kwargs):
@@ -83,11 +83,18 @@ def _fetch_async(func, handler, args, kwargs):
     request = args[0]
 
     tracer = execution_context.get_opencensus_tracer()
-    span = tracer.start_span('[tornado.http_client]{}'.format(request.method))
+
+    method = 'GET'
+    url = request
+    if isinstance(request, HTTPRequest):
+        method = request.method
+        url = request.url
+
+    span = tracer.start_span('[tornado.http_client]{}'.format(method))
     span.span_kind = span_module.SpanKind.CLIENT
 
     # Add the requests url to attributes
-    tracer.add_attribute_to_current_span(HTTP_URL, request.url)
+    tracer.add_attribute_to_current_span(HTTP_URL, url)
 
     future = func(*args, **kwargs)
 
@@ -120,4 +127,3 @@ def _finish_tracing_callback(future):
             HTTP_STATUS_CODE, str(status_code))
 
     tracer.end_span()
-

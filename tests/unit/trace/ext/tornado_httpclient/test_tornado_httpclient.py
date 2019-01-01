@@ -3,7 +3,7 @@ import tornado.testing
 import tornado.web
 from tornado.httpclient import HTTPRequest
 
-from opencensus.trace import config_integration, attributes_helper
+from opencensus.trace import config_integration, attributes_helper, execution_context
 from opencensus.trace import span as span_module
 from opencensus.trace import tracer as tracer_module
 from opencensus.trace.exporters.capturing_exporter import CapturingExporter
@@ -54,12 +54,18 @@ class TestClient(tornado.testing.AsyncHTTPTestCase):
 
         config_integration.trace_integrations(['tornado_httpclient'], tracer=self.tracer)
 
+        self.stack_context = tracer_stack_context()
+        self.stack_context.__enter__()
+        execution_context.set_opencensus_tracer(self.tracer)
+
+    def tearDown(self):
+        self.stack_context.__exit__(None, None, None)
+
     def get_app(self):
         return app()
 
     def test_no_tracer(self):
-        with tracer_stack_context():
-            self.http_client.fetch(self.get_url('/'), self.stop)
+        self.http_client.fetch(self.get_url('/'), self.stop)
 
         response = self.wait()
         self.assertEqual(response.code, 200)
@@ -69,11 +75,10 @@ class TestClient(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(spans[0].span_kind, span_module.SpanKind.CLIENT)
         self.assertEqual(spans[0].name, '[tornado.http_client]GET')
         self.assertEqual(spans[0].attributes[HTTP_STATUS_CODE], '200')
-        assert spans[0].attributes[HTTP_URL].startswith('http://127.0.0.1')
+        assert spans[0].attributes[HTTP_URL].startswith('http://localhost')
 
     def test_simple(self):
-        with tracer_stack_context():
-            self.http_client.fetch(self.get_url('/'), self.stop)
+        self.http_client.fetch(self.get_url('/'), self.stop)
 
         response = self.wait()
         self.assertEqual(response.code, 200)
@@ -83,15 +88,14 @@ class TestClient(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(spans[0].span_kind, span_module.SpanKind.CLIENT)
         self.assertEqual(spans[0].name, '[tornado.http_client]GET')
         self.assertEqual(spans[0].attributes[HTTP_STATUS_CODE], '200')
-        assert spans[0].attributes[HTTP_URL].startswith('http://127.0.0.1')
+        assert spans[0].attributes[HTTP_URL].startswith('http://localhost')
 
     def test_explicit_parameters(self):
-        with tracer_stack_context():
-            self.http_client.fetch(self.get_url('/error'),
-                                   self.stop,
-                                   raise_error=False,
-                                   method='POST',
-                                   body='')
+        self.http_client.fetch(self.get_url('/error'),
+                               self.stop,
+                               raise_error=False,
+                               method='POST',
+                               body='')
         response = self.wait()
         self.assertEqual(response.code, 500)
 
@@ -100,11 +104,10 @@ class TestClient(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(spans[0].span_kind, span_module.SpanKind.CLIENT)
         self.assertEqual(spans[0].name, '[tornado.http_client]POST')
         self.assertEqual(spans[0].attributes[HTTP_STATUS_CODE], '500')
-        assert spans[0].attributes[HTTP_URL].startswith('http://127.0.0.1')
+        assert spans[0].attributes[HTTP_URL].startswith('http://localhost')
 
     def test_request_obj(self):
-        with tracer_stack_context():
-            self.http_client.fetch(HTTPRequest(self.get_url('/')), self.stop)
+        self.http_client.fetch(HTTPRequest(self.get_url('/')), self.stop)
 
         response = self.wait()
 
@@ -115,11 +118,10 @@ class TestClient(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(spans[0].span_kind, span_module.SpanKind.CLIENT)
         self.assertEqual(spans[0].name, '[tornado.http_client]GET')
         self.assertEqual(spans[0].attributes[HTTP_STATUS_CODE], '200')
-        assert spans[0].attributes[HTTP_URL].startswith('http://127.0.0.1')
+        assert spans[0].attributes[HTTP_URL].startswith('http://localhost')
 
     def test_server_error(self):
-        with tracer_stack_context():
-            self.http_client.fetch(self.get_url('/error'), self.stop)
+        self.http_client.fetch(self.get_url('/error'), self.stop)
 
         response = self.wait()
         self.assertEqual(response.code, 500)
@@ -128,8 +130,7 @@ class TestClient(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(len(spans), 1)
 
     def test_server_not_found(self):
-        with tracer_stack_context():
-            self.http_client.fetch(self.get_url('/doesnotexist'), self.stop)
+        self.http_client.fetch(self.get_url('/doesnotexist'), self.stop)
 
         response = self.wait()
         self.assertEqual(response.code, 404)
@@ -138,4 +139,4 @@ class TestClient(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(len(spans), 1)
         self.assertEqual(spans[0].span_kind, span_module.SpanKind.CLIENT)
         self.assertEqual(spans[0].attributes[HTTP_STATUS_CODE], '404')
-        assert spans[0].attributes[HTTP_URL].startswith('http://127.0.0.1')
+        assert spans[0].attributes[HTTP_URL].startswith('http://localhost')
