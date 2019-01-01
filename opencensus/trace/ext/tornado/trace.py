@@ -149,6 +149,7 @@ def _on_finish(func, handler, args, kwargs):
         attribute_key=HTTP_STATUS_CODE,
         attribute_value=str(handler.get_status()))
     tracer.finish()
+    execution_context.clean()
     return func(*args, **kwargs)
 
 
@@ -168,6 +169,7 @@ def _log_exception(func, handler, args, kwargs):
             attribute_key=HTTP_STATUS_CODE,
             attribute_value=str(handler.get_status()))
         tracer.finish()
+        execution_context.clean()
 
     return func(*args, **kwargs)
 
