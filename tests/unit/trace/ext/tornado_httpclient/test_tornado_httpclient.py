@@ -21,6 +21,7 @@ config_integration.trace_integrations(['tornado_httpclient'])
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
+        assert self.request.headers.get('X-Cloud-Trace-Context')
         self.write('{}')
 
 

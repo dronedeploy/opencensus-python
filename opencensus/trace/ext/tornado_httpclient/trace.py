@@ -80,17 +80,24 @@ def _fetch_async(func, handler, args, kwargs):
 
     tracer = execution_context.get_opencensus_tracer()
 
-    method = 'GET'
-    url = request
-    if isinstance(request, HTTPRequest):
-        method = request.method
-        url = request.url
+    if not isinstance(request, HTTPRequest):
+        request = HTTPRequest(url=request, **kwargs)
+        args[0] = request
 
-    span = tracer.start_span('[tornado.http_client]{}'.format(method))
+    try:
+        headers = tracer.propagator.to_headers(tracer.span_context)
+        user_headers = request.headers
+        if user_headers:
+            headers.update(user_headers)
+        request.headers = headers
+    except Exception:  # pragma: NO COVER
+        pass
+
+    span = tracer.start_span('[tornado.http_client]{}'.format(request.method))
     span.span_kind = span_module.SpanKind.CLIENT
 
     # Add the requests url to attributes
-    tracer.add_attribute_to_current_span(HTTP_URL, url)
+    tracer.add_attribute_to_current_span(HTTP_URL, request.url)
 
     future = func(*args, **kwargs)
 
