@@ -15,6 +15,7 @@ import functools
 import logging
 
 import wrapt
+from tornado import stack_context
 from tornado.httpclient import HTTPRequest, HTTPError
 
 from opencensus.trace import execution_context, attributes_helper
@@ -95,7 +96,7 @@ def _fetch_async(func, handler, args, kwargs):
 
     # Finish the Span when the Future is done, making
     # sure the StackContext is restored (it's not by default).
-    callback = functools.partial(_finish_tracing_callback)
+    callback = stack_context.wrap(functools.partial(_finish_tracing_callback))
     future.add_done_callback(callback)
 
     return future
@@ -117,7 +118,6 @@ def _finish_tracing_callback(future):
         status_code = future.result().code
 
     if status_code is not None:
-        tracer = execution_context.get_opencensus_tracer()
         tracer.add_attribute_to_current_span(
             HTTP_STATUS_CODE, str(status_code))
 
