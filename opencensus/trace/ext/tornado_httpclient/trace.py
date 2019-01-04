@@ -14,6 +14,7 @@
 import functools
 import logging
 
+import six
 import wrapt
 from tornado import stack_context
 from tornado.httpclient import HTTPRequest, HTTPError
@@ -49,7 +50,7 @@ def trace_tornado_httpclient():
 
 def _normalize_request(args, kwargs):
     req = args[0]
-    if not isinstance(req, str):
+    if not isinstance(req, six.string_types):
         # Not a string, no need to force the creation of a HTTPRequest
         return (args, kwargs)
 
@@ -79,10 +80,6 @@ def _fetch_async(func, handler, args, kwargs):
     request = args[0]
 
     tracer = execution_context.get_opencensus_tracer()
-
-    if not isinstance(request, HTTPRequest):
-        request = HTTPRequest(url=request, **kwargs)
-        args[0] = request
 
     try:
         headers = tracer.propagator.to_headers(tracer.span_context)
