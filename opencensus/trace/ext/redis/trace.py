@@ -15,6 +15,7 @@ import logging
 from functools import wraps
 
 import redis
+import six
 
 from opencensus.trace import execution_context
 from opencensus.trace import span as span_module
@@ -60,7 +61,11 @@ def patch_redis_classes(client, trace_pipeline=True, trace_pubsub=True):
 
 
 def _normalize_stmt(args):
-    return ' '.join([str(arg) for arg in args])
+    args_encoded = []
+    for arg in args:
+        encoded = arg.encode('utf-8') if isinstance(arg, six.string_types) else str(arg)
+        args_encoded.append(encoded)
+    return ' '.join(args_encoded)
 
 
 def _normalize_stmts(command_stack):

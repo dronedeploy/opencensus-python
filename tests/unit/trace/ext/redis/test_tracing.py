@@ -1,3 +1,4 @@
+# -*- coding: utf8 -*-
 from mock import patch
 import unittest
 
@@ -42,17 +43,23 @@ class TestTracing(unittest.TestCase):
             self.assertEqual(len(spans), 0)
 
     def test_trace_all_client(self):
-        #with patch('redis.StrictRedis.execute_command') as execute_command:
-        #    execute_command.__name__ = 'execute_command'
         self.client.get('my.key')
-        #    self.assertEqual(execute_command.call_count, 1)
-        #    self.assertTrue(True, execute_command.call_args == (('my.key',),))
         spans = self.exporter.spans[0]
         self.assertEqual(len(spans), 1)
         span = spans[0]
         self.assertEqual(span.name, '[{}]{}'.format(MODULE_NAME, 'GET'))
         self.assertEqual(span.attributes, {
             'redis.statement': 'GET my.key',
+        })
+
+    def test_trace_unicode_key(self):
+        self.client.get(u'my.kèy')
+        spans = self.exporter.spans[0]
+        self.assertEqual(len(spans), 1)
+        span = spans[0]
+        self.assertEqual(span.name, '[{}]{}'.format(MODULE_NAME, 'GET'))
+        self.assertEqual(span.attributes, {
+            'redis.statement': 'GET my.kèy',
         })
 
     def test_trace_all_pipeline(self):
