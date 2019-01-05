@@ -77,10 +77,10 @@ def _init(__init__, app, args, kwargs):
     __init__(*args, **kwargs)
     config = app.settings.get(CONFIG_KEY, DEFAULT_TORNADO_TRACER_CONFIG)
     processed_config = {
-        PROPAGATOR_KEY: _obj_or_import(config[PROPAGATOR_KEY]),
-        EXPORTER_KEY: _obj_or_import(config[EXPORTER_KEY]),
-        SAMPLER_KEY: _obj_or_import(config[SAMPLER_KEY]),
-        BLACKLIST_PATHS: config[BLACKLIST_PATHS],
+        PROPAGATOR_KEY: _obj_or_import(config.get(PROPAGATOR_KEY, DEFAULT_TORNADO_TRACER_CONFIG[PROPAGATOR_KEY])),
+        EXPORTER_KEY: _obj_or_import(config.get(EXPORTER_KEY, DEFAULT_TORNADO_TRACER_CONFIG[EXPORTER_KEY])),
+        SAMPLER_KEY: _obj_or_import(config.get(SAMPLER_KEY, DEFAULT_TORNADO_TRACER_CONFIG[SAMPLER_KEY])),
+        BLACKLIST_PATHS: config.get(BLACKLIST_PATHS, DEFAULT_TORNADO_TRACER_CONFIG[BLACKLIST_PATHS]),
     }
     app.settings[CONFIG_KEY] = processed_config
 
@@ -110,7 +110,7 @@ def _convert_to_import(path):
 def _execute(func, handler, args, kwargs):
     with tracer_stack_context():
         config = handler.settings.get(CONFIG_KEY, None)
-        if not config or utils.disable_tracing_url(handler.request.path, config[BLACKLIST_PATHS]):
+        if not config or utils.disable_tracing_url(handler.request.path, config.get(BLACKLIST_PATHS, None)):
             tracer = NoopTracer()
             setattr(handler.request, TRACER, tracer)
             return func(*args, **kwargs)
