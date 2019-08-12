@@ -11,22 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A setup module for Open Source Census Instrumentation Library"""
+"""A setup module for OpenCensus Instrumentation Library"""
 
 from setuptools import find_packages
 from setuptools import setup
 
-extras = {
-    "stackdriver": ['google-cloud-trace>=0.20.1, <0.30'],
-    "prometheus_client": ['prometheus_client==0.3.1'],
-    "requests": ['wrapt==1.10.11']
-}
+exec(open('opencensus/common/version/__init__.py').read())
 
-install_requires = [
-    'google-api-core >= 1.0.0, < 2.0.0',
-]
-
-exec(open("opencensus/__version__.py").read())
 setup(
     name='opencensus',
     version=__version__,  # noqa
@@ -34,7 +25,7 @@ setup(
     author_email='census-developers@googlegroups.com',
     classifiers=[
         'Intended Audience :: Developers',
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python',
@@ -44,13 +35,18 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     description='A stats collection and distributed tracing framework',
     include_package_data=True,
     long_description=open('README.rst').read(),
-    install_requires=install_requires,
-    extras_require=extras,
+    install_requires=[
+        'opencensus-context == 0.2.dev0',
+        'google-api-core >= 1.0.0, < 2.0.0',
+    ],
+    extras_require={},
     license='Apache-2.0',
-    packages=find_packages(),
+    packages=find_packages(exclude=('tests',)),
     namespace_packages=[],
-    url='https://github.com/census-instrumentation/opencensus-python')
+    url='https://github.com/census-instrumentation/opencensus-python',
+)

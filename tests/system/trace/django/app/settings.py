@@ -16,8 +16,6 @@
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 
-import django
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 'secret_key_for_test'
 
@@ -31,33 +29,17 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'opencensus.trace.ext.django',
 )
 
-if django.VERSION >= (1, 10):
-    MIDDLEWARE = (
-        'django.contrib.sessions.middleware.SessionMiddleware',
-        'django.middleware.common.CommonMiddleware',
-        'django.middleware.csrf.CsrfViewMiddleware',
-        'django.contrib.auth.middleware.AuthenticationMiddleware',
-        'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
-        'django.contrib.messages.middleware.MessageMiddleware',
-        'django.middleware.clickjacking.XFrameOptionsMiddleware',
-        'django.middleware.security.SecurityMiddleware',
-        'opencensus.trace.ext.django.middleware.OpencensusMiddleware',
-    )
-
-# Middleware interface for Django version before 1.10
-MIDDLEWARE_CLASSES = (
+MIDDLEWARE = (
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'opencensus.trace.ext.django.middleware.OpencensusMiddleware',
+    'opencensus.ext.django.middleware.OpencensusMiddleware',
 )
 
 ROOT_URLCONF = 'app.urls'
@@ -80,22 +62,19 @@ TEMPLATES = [
     },
 ]
 
-OPENCENSUS_TRACE = {
-    'SAMPLER':
-    'opencensus.trace.samplers.always_on.AlwaysOnSampler',
-    'EXPORTER':
-    'opencensus.trace.exporters.stackdriver_exporter.StackdriverExporter',
-    'PROPAGATOR':
-    'opencensus.trace.propagation.google_cloud_format.'
-    'GoogleCloudFormatPropagator',
-}
-
-OPENCENSUS_TRACE_PARAMS = {
-    'SAMPLING_RATE': 0.5,
-    'BLACKLIST_PATHS': [
-        '_ah/health',
-    ],
-    'TRANSPORT': 'opencensus.trace.exporters.transports.sync.SyncTransport',
+OPENCENSUS = {
+    'TRACE': {
+        'SAMPLER':
+            'opencensus.trace.samplers.AlwaysOnSampler()',
+        'EXPORTER':
+            'opencensus.ext.stackdriver.trace_exporter.StackdriverExporter()',
+        'PROPAGATOR':
+            'opencensus.trace.propagation.google_cloud_format.'
+            'GoogleCloudFormatPropagator()',
+        'BLACKLIST_PATHS': [
+            '_ah/health',
+        ],
+    }
 }
 
 # Internationalization

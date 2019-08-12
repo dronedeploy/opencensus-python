@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from opencensus.metrics.export import metric_descriptor
-
 
 class TimeSeries(object):
     """Time series data for a given metric and time interval.
 
     This class implements the spec for v1 TimeSeries structs as of
-    opencensus-proto release v0.0.2. See opencensus-proto for details:
+    opencensus-proto release v0.1.0. See opencensus-proto for details:
 
-        https://github.com/census-instrumentation/opencensus-proto/blob/24333298e36590ea0716598caacc8959fc393c48/src/opencensus/proto/metrics/v1/metrics.proto#L112
+        https://github.com/census-instrumentation/opencensus-proto/blob/v0.1.0/src/opencensus/proto/metrics/v1/metrics.proto#L132
 
     A TimeSeries is a collection of data points that describes the time-varying
     values of a metric.
@@ -40,13 +38,26 @@ class TimeSeries(object):
     """  # noqa
 
     def __init__(self, label_values, points, start_timestamp):
-        if not label_values:
-            raise ValueError("label_values must not be null or empty")
+        if label_values is None:
+            raise ValueError("label_values must not be None")
         if not points:
             raise ValueError("points must not be null or empty")
         self._label_values = label_values
         self._points = points
         self._start_timestamp = start_timestamp
+
+    def __repr__(self):
+        points_repr = '[{}]'.format(
+            ', '.join(repr(point.value) for point in self.points))
+
+        lv_repr = tuple(lv.value for lv in self.label_values)
+        return ('{}({}, label_values={}, start_timestamp={})'
+                .format(
+                    type(self).__name__,
+                    points_repr,
+                    lv_repr,
+                    self.start_timestamp
+                ))
 
     @property
     def start_timestamp(self):
@@ -60,15 +71,20 @@ class TimeSeries(object):
     def points(self):
         return self._points
 
-    def check_points_type(self, type_):
-        """Check that each point's value is an instance `type_`.
+    def check_points_type(self, type_class):
+        """Check that each point's value is an instance of `type_class`.
 
-        :type type_: type
-        :param type_: Type to check against.
+        `type_class` should typically be a Value type, i.e. one that extends
+        :class: `opencensus.metrics.export.value.Value`.
+
+        :type type_class: type
+        :param type_class: Type to check against.
+
+        :rtype: bool
+        :return: Whether all points are instances of `type_class`.
         """
-        type_class = (
-            metric_descriptor.MetricDescriptorType.to_type_class(type_))
         for point in self.points:
-            if not isinstance(point.value.value, type_class):
+            if (point.value is not None
+                    and not isinstance(point.value, type_class)):
                 return False
         return True

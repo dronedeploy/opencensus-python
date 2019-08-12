@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-import mock
 from datetime import datetime
+import mock
+import unittest
+
+from opencensus.common import utils
 from opencensus.stats import aggregation as aggregation_module
 from opencensus.stats import measure as measure_module
 from opencensus.stats import view_data as view_data_module
@@ -82,7 +84,7 @@ class TestViewData(unittest.TestCase):
 
         context = mock.Mock()
         context.map = {'key1': 'val1', 'key2': 'val2'}
-        time = datetime.utcnow().isoformat() + 'Z'
+        time = utils.to_iso_str()
         value = 1
         self.assertEqual({}, view_data.tag_value_aggregation_data_map)
 
@@ -116,9 +118,8 @@ class TestViewData(unittest.TestCase):
 
     def test_record_with_attachment(self):
         boundaries = [1, 2, 3]
-        distribution = {1: "test"}
         distribution_aggregation = aggregation_module.DistributionAggregation(
-            boundaries=boundaries, distribution=distribution)
+            boundaries=boundaries)
         name = "testName"
         description = "testMeasure"
         unit = "testUnit"
@@ -143,7 +144,7 @@ class TestViewData(unittest.TestCase):
             view=view, start_time=start_time, end_time=end_time)
         context = mock.Mock
         context.map = {'key1': 'val1', 'key2': 'val2'}
-        time = datetime.utcnow().isoformat() + 'Z'
+        time = utils.to_iso_str()
         value = 1
 
         view_data.record(
@@ -166,9 +167,8 @@ class TestViewData(unittest.TestCase):
 
     def test_record_with_attachment_no_histogram(self):
         boundaries = None
-        distribution = {1: "test"}
         distribution_aggregation = aggregation_module.DistributionAggregation(
-            boundaries=boundaries, distribution=distribution)
+            boundaries=boundaries)
         name = "testName"
         description = "testMeasure"
         unit = "testUnit"
@@ -193,7 +193,7 @@ class TestViewData(unittest.TestCase):
             view=view, start_time=start_time, end_time=end_time)
         context = mock.Mock
         context.map = {'key1': 'val1', 'key2': 'val2'}
-        time = datetime.utcnow().isoformat() + 'Z'
+        time = utils.to_iso_str()
         value = 1
         view_data.record(
             context=context,
@@ -213,7 +213,7 @@ class TestViewData(unittest.TestCase):
             view_data.tag_value_aggregation_data_map[tuple_vals].exemplars)
 
     def test_record_with_multi_keys(self):
-        measure = mock.Mock()
+        measure = mock.Mock(spec=measure_module.MeasureInt)
         sum_aggregation = aggregation_module.SumAggregation()
         view = view_module.View("test_view", "description", ['key1', 'key2'],
                                 measure, sum_aggregation)
@@ -223,7 +223,7 @@ class TestViewData(unittest.TestCase):
             view=view, start_time=start_time, end_time=end_time)
         context = mock.Mock()
         context.map = {'key1': 'val1', 'key2': 'val2'}
-        time = datetime.utcnow().isoformat() + 'Z'
+        time = utils.to_iso_str()
         value = 1
         self.assertEqual({}, view_data.tag_value_aggregation_data_map)
 
@@ -242,7 +242,7 @@ class TestViewData(unittest.TestCase):
 
         context_2 = mock.Mock()
         context_2.map = {'key1': 'val3', 'key2': 'val2'}
-        time_2 = datetime.utcnow().isoformat() + 'Z'
+        time_2 = utils.to_iso_str()
         value_2 = 2
         view_data.record(
             context=context_2,
@@ -258,7 +258,7 @@ class TestViewData(unittest.TestCase):
         sum_data_2 = view_data.tag_value_aggregation_data_map.get(tuple_vals_2)
         self.assertEqual(2, sum_data_2.sum_data)
 
-        time_3 = datetime.utcnow().isoformat() + 'Z'
+        time_3 = utils.to_iso_str()
         value_3 = 3
         # Use the same context {'key1': 'val1', 'key2': 'val2'}.
         # Record to entry [(val1, val2), sum=1].
@@ -269,7 +269,7 @@ class TestViewData(unittest.TestCase):
         self.assertEqual(2, sum_data_2.sum_data)
 
     def test_record_with_missing_key_in_context(self):
-        measure = mock.Mock()
+        measure = mock.Mock(spec=measure_module.MeasureInt)
         sum_aggregation = aggregation_module.SumAggregation()
         view = view_module.View("test_view", "description", ['key1', 'key2'],
                                 measure, sum_aggregation)
@@ -282,7 +282,7 @@ class TestViewData(unittest.TestCase):
             'key1': 'val1',
             'key3': 'val3'
         }  # key2 is not in the context.
-        time = datetime.utcnow().isoformat() + 'Z'
+        time = utils.to_iso_str()
         value = 4
         view_data.record(
             context=context, value=value, timestamp=time, attachments=None)
@@ -290,6 +290,27 @@ class TestViewData(unittest.TestCase):
             tags=context.map, columns=view.columns)
         tuple_vals = tuple(tag_values)
         self.assertEqual(['val1', None], tag_values)
+        self.assertTrue(tuple_vals in view_data.tag_value_aggregation_data_map)
+        sum_data = view_data.tag_value_aggregation_data_map.get(tuple_vals)
+        self.assertEqual(4, sum_data.sum_data)
+
+    def test_record_with_none_context(self):
+        measure = mock.Mock(spec=measure_module.MeasureInt)
+        sum_aggregation = aggregation_module.SumAggregation()
+        view = view_module.View("test_view", "description", ['key1', 'key2'],
+                                measure, sum_aggregation)
+        start_time = datetime.utcnow()
+        end_time = datetime.utcnow()
+        view_data = view_data_module.ViewData(
+            view=view, start_time=start_time, end_time=end_time)
+        time = utils.to_iso_str()
+        value = 4
+        view_data.record(
+            context=None, value=value, timestamp=time, attachments=None)
+        tag_values = view_data.get_tag_values(
+            tags={}, columns=view.columns)
+        tuple_vals = tuple(tag_values)
+        self.assertEqual([None, None], tag_values)
         self.assertTrue(tuple_vals in view_data.tag_value_aggregation_data_map)
         sum_data = view_data.tag_value_aggregation_data_map.get(tuple_vals)
         self.assertEqual(4, sum_data.sum_data)

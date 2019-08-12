@@ -14,8 +14,7 @@
 
 import six
 
-from opencensus.metrics.export.value import ValueDistribution
-from opencensus.metrics.export.value import ValueSummary
+from opencensus.metrics.export import value
 
 
 class _MetricDescriptorTypeMeta(type):
@@ -39,7 +38,7 @@ class MetricDescriptorType(object):
     MetricDescriptorType is an enum of valid MetricDescriptor type values. See
     opencensus-proto for details:
 
-        https://github.com/census-instrumentation/opencensus-proto/blob/24333298e36590ea0716598caacc8959fc393c48/src/opencensus/proto/metrics/v1/metrics.proto#L73  # noqa
+    https://github.com/census-instrumentation/opencensus-proto/blob/v0.1.0/src/opencensus/proto/metrics/v1/metrics.proto#L79
 
     A gauge is an instantaneous measurement of a value.
 
@@ -81,19 +80,20 @@ class MetricDescriptorType(object):
     # is not recommended, since it cannot be aggregated.
     SUMMARY = 7
 
+    _type_map = {
+        GAUGE_INT64: value.ValueLong,
+        GAUGE_DOUBLE: value.ValueDouble,
+        GAUGE_DISTRIBUTION: value.ValueDistribution,
+        CUMULATIVE_INT64: value.ValueLong,
+        CUMULATIVE_DOUBLE: value.ValueDouble,
+        CUMULATIVE_DISTRIBUTION: value.ValueDistribution,
+        SUMMARY: value.ValueSummary
+    }
+
     @classmethod
     def to_type_class(cls, metric_descriptor_type):
-        type_map = {
-            cls.GAUGE_INT64: int,
-            cls.GAUGE_DOUBLE: float,
-            cls.GAUGE_DISTRIBUTION: ValueDistribution,
-            cls.CUMULATIVE_INT64: int,
-            cls.CUMULATIVE_DOUBLE: float,
-            cls.CUMULATIVE_DISTRIBUTION: ValueDistribution,
-            cls.SUMMARY: ValueSummary
-        }
         try:
-            return type_map[metric_descriptor_type]
+            return cls._type_map[metric_descriptor_type]
         except KeyError:
             raise ValueError("Unknown MetricDescriptorType value")
 
@@ -102,9 +102,9 @@ class MetricDescriptor(object):
     """Defines a metric type and its schema.
 
     This class implements the spec for v1 MetricDescriptors, as of
-    opencensus-proto release v0.0.2. See opencensus-proto for details:
+    opencensus-proto release v0.1.0. See opencensus-proto for details:
 
-        https://github.com/census-instrumentation/opencensus-proto/blob/24333298e36590ea0716598caacc8959fc393c48/src/opencensus/proto/metrics/v1/metrics.proto#L53  # noqa
+    https://github.com/census-instrumentation/opencensus-proto/blob/v0.1.0/src/opencensus/proto/metrics/v1/metrics.proto#L59
 
     :type name: str
     :param name: The metric type, including its DNS name prefix. It must be
@@ -119,8 +119,8 @@ class MetricDescriptor(object):
     format described by http://unitsofmeasure.org/ucum.html.
 
     :type type_: int
-    :param unit: The unit in which the metric value is reported. The
-    MetricDescriptorType class enumerates valid options.
+    :param type_: The type of metric. MetricDescriptorType enumerates the valid
+    options.
 
     :type label_keys: list(:class: '~opencensus.metrics.label_key.LabelKey')
     :param label_keys: The label keys associated with the metric descriptor.
@@ -130,8 +130,8 @@ class MetricDescriptor(object):
         if type_ not in MetricDescriptorType:
             raise ValueError("Invalid type")
 
-        if not label_keys:
-            raise ValueError("label_keys must not be empty or null")
+        if label_keys is None:
+            raise ValueError("label_keys must not be None")
 
         if any(key is None for key in label_keys):
             raise ValueError("label_keys must not contain null keys")
@@ -141,6 +141,17 @@ class MetricDescriptor(object):
         self._unit = unit
         self._type = type_
         self._label_keys = label_keys
+
+    def __repr__(self):
+        type_name = MetricDescriptorType.to_type_class(self.type).__name__
+        return ('{}(name="{}", description="{}", unit={}, type={})'
+                .format(
+                    type(self).__name__,
+                    self.name,
+                    self.description,
+                    self.unit,
+                    type_name,
+                ))
 
     @property
     def name(self):

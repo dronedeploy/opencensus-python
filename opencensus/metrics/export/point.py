@@ -16,11 +16,14 @@
 class Point(object):
     """A timestamped measurement of a TimeSeries.
 
-    :type value: Value
-    :param value: the Value of the Point.
+    :type value: :class:`opencensus.metrics.export.value.ValueDouble` or
+        :class:`opencensus.metrics.export.value.ValueLong` or
+        :class:`opencensus.metrics.export.value.ValueSummary` or
+        :class:`opencensus.metrics.export.value.ValueDistribution`
+    :param value: the point value.
 
     :type timestamp: time
-    :param timestamp: the Timestamp when the Point was recorded.
+    :param timestamp: the timestamp when the `Point` was recorded.
     """
 
     def __init__(self, value, timestamp):
@@ -29,10 +32,16 @@ class Point(object):
 
     @property
     def value(self):
-        """Returns the Value"""
         return self._value
 
     @property
     def timestamp(self):
-        """Returns the Timestamp when this Point was recorded."""
         return self._timestamp
+
+    def __repr__(self):
+        return ("{}(value={}, timestamp={})"
+                .format(
+                    type(self).__name__,
+                    self.value,
+                    self.timestamp
+                ))

@@ -1,23 +1,21 @@
+dist: xenial
+
 language: python
+
 python:
+  - '2.7'
+  - '3.4'
+  - '3.5'
   - '3.6'
+  - '3.7'
 
 install:
-  - pip install --upgrade nox-automation
+  - pip install tox-travis
 
 script:
-  - nox -s docs
+  - tox
   - touch docs/.nojekyll
 
 branches:
   only:
     - master
-
-deploy:
-  provider: pages
-  local_dir: docs
-  skip_cleanup: true
-  email: yanhuil@google.com # To satisfy the CLA check, replace this with bot email.
-  github_token: $GITHUB_TOKEN # Set in travis-ci.org dashboard
-  on:
-    branch: master

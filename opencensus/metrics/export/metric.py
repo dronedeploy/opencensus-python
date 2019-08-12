@@ -13,34 +13,15 @@
 # limitations under the License.
 
 from opencensus.metrics.export import metric_descriptor
-from opencensus.metrics.export import value
-
-
-DESCRIPTOR_VALUE = {
-    metric_descriptor.MetricDescriptorType.GAUGE_INT64:
-    value.ValueLong,
-    metric_descriptor.MetricDescriptorType.CUMULATIVE_INT64:
-    value.ValueLong,
-    metric_descriptor.MetricDescriptorType.GAUGE_DOUBLE:
-    value.ValueDouble,
-    metric_descriptor.MetricDescriptorType.CUMULATIVE_DOUBLE:
-    value.ValueDouble,
-    metric_descriptor.MetricDescriptorType.GAUGE_DISTRIBUTION:
-    value.ValueDistribution,
-    metric_descriptor.MetricDescriptorType.CUMULATIVE_DISTRIBUTION:
-    value.ValueDistribution,
-    metric_descriptor.MetricDescriptorType.SUMMARY:
-    value.ValueSummary,
-}
 
 
 class Metric(object):
     """A collection of time series data and label metadata.
 
     This class implements the spec for v1 Metrics as of opencensus-proto
-    release v0.0.2. See opencensus-proto for details:
+    release v0.1.0. See opencensus-proto for details:
 
-    https://github.com/census-instrumentation/opencensus-proto/blob/24333298e36590ea0716598caacc8959fc393c48/src/opencensus/proto/metrics/v1/metrics.proto#33
+    https://github.com/census-instrumentation/opencensus-proto/blob/v0.1.0/src/opencensus/proto/metrics/v1/metrics.proto#L35
 
     Defines a Metric which has one or more timeseries.
 
@@ -61,6 +42,14 @@ class Metric(object):
         self._descriptor = descriptor
         self._check_type()
 
+    def __repr__(self):
+        return ('{}(time_series={}, descriptor.name="{}")'
+                .format(
+                    type(self).__name__,
+                    "<{} TimeSeries>".format(len(self.time_series)),
+                    self.descriptor.name,
+                ))
+
     @property
     def time_series(self):
         return self._time_series
@@ -71,9 +60,8 @@ class Metric(object):
 
     def _check_type(self):
         """Check that point value types match the descriptor type."""
-        check_type = DESCRIPTOR_VALUE.get(self.descriptor.type)
-        if check_type is None:
-            raise ValueError("Unknown metric descriptor type")
+        check_type = metric_descriptor.MetricDescriptorType.to_type_class(
+            self.descriptor.type)
         for ts in self.time_series:
             if not ts.check_points_type(check_type):
                 raise ValueError("Invalid point value type")

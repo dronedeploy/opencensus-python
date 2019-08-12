@@ -17,7 +17,6 @@
 import unittest
 
 from opencensus.metrics import label_value
-from opencensus.metrics.export import metric_descriptor
 from opencensus.metrics.export import point
 from opencensus.metrics.export import time_series
 from opencensus.metrics.export import value
@@ -27,15 +26,15 @@ LABEL_VALUE1 = label_value.LabelValue('value one')
 LABEL_VALUE2 = label_value.LabelValue('价值二')
 LABEL_VALUES = (LABEL_VALUE1, LABEL_VALUE2)
 POINTS = (point.Point(
-    value.Value.long_value(1), "2018-10-09T23:33:44.012345Z"),
+    value.ValueLong(1), "2018-10-09T23:33:44.012345Z"),
           point.Point(
-              value.Value.long_value(2), "2018-10-10T00:33:44.012345Z"),
+              value.ValueLong(2), "2018-10-10T00:33:44.012345Z"),
           point.Point(
-              value.Value.long_value(3), "2018-10-10T01:33:44.012345Z"),
+              value.ValueLong(3), "2018-10-10T01:33:44.012345Z"),
           point.Point(
-              value.Value.long_value(4), "2018-10-10T02:33:44.012345Z"),
+              value.ValueLong(4), "2018-10-10T02:33:44.012345Z"),
           point.Point(
-              value.Value.long_value(5), "2018-10-10T03:33:44.012345Z"))
+              value.ValueLong(5), "2018-10-10T03:33:44.012345Z"))
 
 
 class TestTimeSeries(unittest.TestCase):
@@ -51,26 +50,18 @@ class TestTimeSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             time_series.TimeSeries(None, POINTS, START_TIMESTAMP)
         with self.assertRaises(ValueError):
-            time_series.TimeSeries([], POINTS, START_TIMESTAMP)
-        with self.assertRaises(ValueError):
             time_series.TimeSeries(LABEL_VALUES, None, START_TIMESTAMP)
         with self.assertRaises(ValueError):
             time_series.TimeSeries(LABEL_VALUES, [], START_TIMESTAMP)
 
     def test_check_points_type(self):
         ts = time_series.TimeSeries(LABEL_VALUES, POINTS, START_TIMESTAMP)
-        self.assertTrue(
-            ts.check_points_type(
-                metric_descriptor.MetricDescriptorType.GAUGE_INT64))
+        self.assertTrue(ts.check_points_type(value.ValueLong))
 
         bad_points = POINTS + (point.Point(
-            value.Value.double_value(6.0), "2018-10-10T04:33:44.012345Z"), )
+            value.ValueDouble(6.0), "2018-10-10T04:33:44.012345Z"), )
         bad_time_series = time_series.TimeSeries(LABEL_VALUES, bad_points,
                                                  START_TIMESTAMP)
 
-        self.assertFalse(
-            bad_time_series.check_points_type(
-                metric_descriptor.MetricDescriptorType.GAUGE_INT64))
-        self.assertFalse(
-            bad_time_series.check_points_type(
-                metric_descriptor.MetricDescriptorType.GAUGE_DOUBLE))
+        self.assertFalse(bad_time_series.check_points_type(value.ValueLong))
+        self.assertFalse(bad_time_series.check_points_type(value.ValueLong))

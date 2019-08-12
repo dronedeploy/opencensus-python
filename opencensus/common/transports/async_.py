@@ -20,23 +20,23 @@ from six.moves import queue
 from six.moves import range
 
 from opencensus.common.transports import base
+from opencensus.trace import execution_context
 
 _DEFAULT_GRACE_PERIOD = 5.0  # Seconds
-_DEFAULT_MAX_BATCH_SIZE = 200
-_WAIT_PERIOD = 60.0  # Seconds
+_DEFAULT_MAX_BATCH_SIZE = 600
+_DEFAULT_WAIT_PERIOD = 60.0  # Seconds
 _WORKER_THREAD_NAME = 'opencensus.common.Worker'
 _WORKER_TERMINATOR = object()
+
+logger = logging.getLogger(__name__)
 
 
 class _Worker(object):
     """A background thread that exports batches of data.
 
-    :type exporter: :class:`~opencensus.trace.exporters.base.Exporter` or
-                    :class:`~opencensus.stats.exporters.base.StatsExporter`
-    :param exporter: Instances of Exporter objects. Defaults to
-                    :class:`.PrintExporter`. The rest options are
-                    :class:`.ZipkinExporter`, :class:`.StackdriverExporter`,
-                    :class:`.LoggingExporter`, :class:`.FileExporter`.
+    :type exporter: :class:`~opencensus.trace.base_exporter.Exporter` or
+                    :class:`~opencensus.stats.base_exporter.StatsExporter`
+    :param exporter: Instance of Exporter object.
 
     :type grace_period: float
     :param grace_period: The amount of time to wait for pending data to
@@ -45,12 +45,19 @@ class _Worker(object):
     :type max_batch_size: int
     :param max_batch_size: The maximum number of items to send at a time
                            in the background thread.
+
+    :type wait_period: int
+    :param wait_period: The amount of time to wait before sending the next
+                        batch of data.
     """
-    def __init__(self, exporter, grace_period=_DEFAULT_GRACE_PERIOD,
-                 max_batch_size=_DEFAULT_MAX_BATCH_SIZE):
+    def __init__(self, exporter,
+                 grace_period=_DEFAULT_GRACE_PERIOD,
+                 max_batch_size=_DEFAULT_MAX_BATCH_SIZE,
+                 wait_period=_DEFAULT_WAIT_PERIOD):
         self.exporter = exporter
         self._grace_period = grace_period
         self._max_batch_size = max_batch_size
+        self._wait_period = wait_period
         self._queue = queue.Queue(0)
         self._lock = threading.Lock()
         self._event = threading.Event()
@@ -104,7 +111,7 @@ class _Worker(object):
                 try:
                     self.exporter.emit(data)
                 except Exception:
-                    logging.exception(
+                    logger.exception(
                         '%s failed to emit data.'
                         'Dropping %s objects from queue.',
                         self.exporter.__class__.__name__,
@@ -116,8 +123,8 @@ class _Worker(object):
 
             # self._event is set at exit, at which point we start draining the
             # queue immediately. If self._event is unset, block for
-            # _WAIT_PERIOD between each batch of exports.
-            self._event.wait(_WAIT_PERIOD)
+            # self.wait_period between each batch of exports.
+            self._event.wait(self._wait_period)
 
             if quit_:
                 break
@@ -135,6 +142,9 @@ class _Worker(object):
             self._thread = threading.Thread(
                 target=self._thread_main, name=_WORKER_THREAD_NAME)
             self._thread.daemon = True
+            # Indicate that this thread is an exporter thread. Used for
+            # auto-collection.
+            execution_context.set_is_exporter(True)
             self._thread.start()
             atexit.register(self._export_pending_data)
 
@@ -183,12 +193,9 @@ class _Worker(object):
 class AsyncTransport(base.Transport):
     """Asynchronous transport that uses a background thread.
 
-    :type exporter: :class:`~opencensus.trace.exporters.base.Exporter` or
-                    :class:`~opencensus.stats.exporters.base.StatsExporter`
-    :param exporter: Instances of Exporter objects. Defaults to
-                     :class:`.PrintExporter`. The rest options are
-                     :class:`.ZipkinExporter`, :class:`.StackdriverExporter`,
-                     :class:`.LoggingExporter`, :class:`.FileExporter`.
+    :type exporter: :class:`~opencensus.trace.base_exporter.Exporter` or
+                    :class:`~opencensus.stats.base_exporter.StatsExporter`
+    :param exporter: Instance of Exporter object.
 
     :type grace_period: float
     :param grace_period: The amount of time to wait for pending data to
@@ -197,12 +204,23 @@ class AsyncTransport(base.Transport):
     :type max_batch_size: int
     :param max_batch_size: The maximum number of items to send at a time
                            in the background thread.
+
+    :type wait_period: int
+    :param wait_period: The amount of time to wait before sending the next
+                        batch of data.
     """
 
-    def __init__(self, exporter, grace_period=_DEFAULT_GRACE_PERIOD,
-                 max_batch_size=_DEFAULT_MAX_BATCH_SIZE):
+    def __init__(self, exporter,
+                 grace_period=_DEFAULT_GRACE_PERIOD,
+                 max_batch_size=_DEFAULT_MAX_BATCH_SIZE,
+                 wait_period=_DEFAULT_WAIT_PERIOD):
         self.exporter = exporter
-        self.worker = _Worker(exporter, grace_period, max_batch_size)
+        self.worker = _Worker(
+            exporter,
+            grace_period,
+            max_batch_size,
+            wait_period,
+        )
         self.worker.start()
 
     def export(self, data):

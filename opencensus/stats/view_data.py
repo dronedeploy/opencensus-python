@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime
-import copy
+from opencensus.common import utils
 
 
 class ViewData(object):
@@ -43,6 +42,8 @@ class ViewData(object):
         """the current view in the view data"""
         return self._view
 
+    # TODO: `start_time` and `end_time` are sometimes a `datetime` object but
+    # should always be a `string`.
     @property
     def start_time(self):
         """the current start time in the view data"""
@@ -60,11 +61,11 @@ class ViewData(object):
 
     def start(self):
         """sets the start time for the view data"""
-        self._start_time = datetime.utcnow().isoformat() + 'Z'
+        self._start_time = utils.to_iso_str()
 
     def end(self):
         """sets the end time for the view data"""
-        self._end_time = datetime.utcnow().isoformat() + 'Z'
+        self._end_time = utils.to_iso_str()
 
     def get_tag_values(self, tags, columns):
         """function to get the tag values from tags and columns"""
@@ -81,11 +82,15 @@ class ViewData(object):
 
     def record(self, context, value, timestamp, attachments=None):
         """records the view data against context"""
-        tag_values = self.get_tag_values(tags=context.map,
+        if context is None:
+            tags = dict()
+        else:
+            tags = context.map
+        tag_values = self.get_tag_values(tags=tags,
                                          columns=self.view.columns)
         tuple_vals = tuple(tag_values)
         if tuple_vals not in self.tag_value_aggregation_data_map:
-            self.tag_value_aggregation_data_map[tuple_vals] = copy.deepcopy(
-                self.view.aggregation.aggregation_data)
+            self.tag_value_aggregation_data_map[tuple_vals] = \
+                self.view.new_aggregation_data()
         self.tag_value_aggregation_data_map.get(tuple_vals).\
             add_sample(value, timestamp, attachments)

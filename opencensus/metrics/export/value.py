@@ -13,63 +13,15 @@
 # limitations under the License.
 """
 The classes in this module implement the spec for v1 Metrics as of
-opencensus-proto release v0.0.2. See opencensus-proto for details:
+opencensus-proto release v0.1.0. See opencensus-proto for details:
 
-https://github.com/census-instrumentation/opencensus-proto/blob/24333298e36590ea0716598caacc8959fc393c48/src/opencensus/proto/metrics/v1/metrics.proto
+https://github.com/census-instrumentation/opencensus-proto/blob/v0.1.0/src/opencensus/proto/metrics/v1/metrics.proto
 """  # noqa
 
 from copy import copy
 
 
-class Value(object):
-    """The actual point value for a Point.
-    Currently there are four types of Value:
-     <ul>
-       <li>double
-       <li>long
-       <li>Summary
-       <li>Distribution (TODO(mayurkale): add Distribution class)
-     </ul>
-    Each Point contains exactly one of the four Value types.
-    """
-
-    def __init__(self, value):
-        self._value = value
-
-    @staticmethod
-    def double_value(value):
-        """Returns a double Value
-
-        :type value: float
-        :param value: value in double
-        """
-        return ValueDouble(value)
-
-    @staticmethod
-    def long_value(value):
-        """Returns a long Value
-
-        :type value: long
-        :param value: value in long
-        """
-        return ValueLong(value)
-
-    @staticmethod
-    def summary_value(value):
-        """Returns a summary Value
-
-        :type value: Summary
-        :param value: value in Summary
-        """
-        return ValueSummary(value)
-
-    @property
-    def value(self):
-        """Returns the value."""
-        return self._value
-
-
-class ValueDouble(Value):
+class ValueDouble(object):
     """A 64-bit double-precision floating-point number.
 
     :type value: float
@@ -77,10 +29,21 @@ class ValueDouble(Value):
     """
 
     def __init__(self, value):
-        super(ValueDouble, self).__init__(value)
+        self._value = value
+
+    def __repr__(self):
+        return ("{}({})"
+                .format(
+                    type(self).__name__,
+                    self.value,
+                ))
+
+    @property
+    def value(self):
+        return self._value
 
 
-class ValueLong(Value):
+class ValueLong(object):
     """A 64-bit integer.
 
     :type value: long
@@ -88,10 +51,21 @@ class ValueLong(Value):
     """
 
     def __init__(self, value):
-        super(ValueLong, self).__init__(value)
+        self._value = value
+
+    def __repr__(self):
+        return ("{}({})"
+                .format(
+                    type(self).__name__,
+                    self.value,
+                ))
+
+    @property
+    def value(self):
+        return self._value
 
 
-class ValueSummary(Value):
+class ValueSummary(object):
     """Represents a snapshot values calculated over an arbitrary time window.
 
     :type value: summary
@@ -99,7 +73,18 @@ class ValueSummary(Value):
     """
 
     def __init__(self, value):
-        super(ValueSummary, self).__init__(value)
+        self._value = value
+
+    def __repr__(self):
+        return ("{}({})"
+                .format(
+                    type(self).__name__,
+                    self.value,
+                ))
+
+    @property
+    def value(self):
+        return self._value
 
 
 class Exemplar(object):
@@ -125,6 +110,13 @@ class Exemplar(object):
         self._timestamp = timestamp
         self._attachments = attachments
 
+    def __repr__(self):
+        return ("{}({})"
+                .format(
+                    type(self).__name__,
+                    self.value,
+                ))
+
     @property
     def value(self):
         return self._value
@@ -149,9 +141,16 @@ class Bucket(object):
     distribution does not have a histogram.
     """
 
-    def __init__(self, count, exemplar):
+    def __init__(self, count, exemplar=None):
         self._count = count
         self._exemplar = exemplar
+
+    def __repr__(self):
+        return ("{}({})"
+                .format(
+                    type(self).__name__,
+                    self.count,
+                ))
 
     @property
     def count(self):
@@ -201,12 +200,19 @@ class BucketOptions(object):
     def __init__(self, type_=None):
         self._type = type_
 
+    def __repr__(self):
+        return ("{}({})"
+                .format(
+                    type(self).__name__,
+                    self.type_,
+                ))
+
     @property
     def type_(self):
         return self._type
 
 
-class ValueDistribution(Value):
+class ValueDistribution(object):
     """Summary statistics for a population of values.
 
     Distribution contains summary statistics for a population of values. It
@@ -249,9 +255,9 @@ class ValueDistribution(Value):
             raise ValueError("bucket_options must not be null")
         if bucket_options.type_ is None:
             if buckets is not None:
-                raise ValueError("buckets must be null if the distribution has"
-                                 "no histogram (i.e. bucket_options.type is "
-                                 "null)")
+                raise ValueError("buckets must be null if the distribution "
+                                 "has no histogram (i.e. bucket_options.type "
+                                 "is null)")
         else:
             if len(buckets) != len(bucket_options.type_.bounds) + 1:
                 # Note that this includes the implicit 0 and positive-infinity
@@ -267,6 +273,18 @@ class ValueDistribution(Value):
         self._sum_of_squared_deviation = sum_of_squared_deviation
         self._bucket_options = bucket_options
         self._buckets = buckets
+
+    def __repr__(self):
+        try:
+            bounds = self.bucket_options.type_.bounds,
+        except AttributeError:
+            bounds = None
+
+        return ("{}({})"
+                .format(
+                    type(self).__name__,
+                    bounds
+                ))
 
     @property
     def count(self):

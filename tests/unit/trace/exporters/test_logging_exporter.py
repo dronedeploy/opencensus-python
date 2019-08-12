@@ -17,9 +17,9 @@ import unittest
 
 import mock
 
+from opencensus.trace import logging_exporter
 from opencensus.trace import span_context
 from opencensus.trace import span_data as span_data_module
-from opencensus.trace.exporters import logging_exporter
 
 
 class TestLoggingExporter(unittest.TestCase):
@@ -52,7 +52,8 @@ class TestLoggingExporter(unittest.TestCase):
                 end_time=None,
                 child_span_count=None,
                 stack_trace=None,
-                time_events=None,
+                annotations=None,
+                message_events=None,
                 links=None,
                 status=None,
                 same_process_as_parent_span=None,

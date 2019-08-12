@@ -15,6 +15,7 @@
 import datetime
 import unittest
 
+from opencensus.common import utils
 from opencensus.trace import link
 from opencensus.trace import span_context
 from opencensus.trace import span_data as span_data_module
@@ -31,12 +32,13 @@ class TestSpanData(unittest.TestCase):
             span_id='6e0c63257de34c92',
             parent_span_id='6e0c63257de34c93',
             attributes={'key1': 'value1'},
-            start_time=datetime.datetime.utcnow().isoformat() + 'Z',
-            end_time=datetime.datetime.utcnow().isoformat() + 'Z',
+            start_time=utils.to_iso_str(),
+            end_time=utils.to_iso_str(),
             stack_trace=None,
             links=None,
             status=None,
-            time_events=None,
+            annotations=None,
+            message_events=None,
             same_process_as_parent_span=None,
             child_span_count=None,
             span_kind=0,
@@ -49,12 +51,13 @@ class TestSpanData(unittest.TestCase):
             span_id='6e0c63257de34c92',
             parent_span_id='6e0c63257de34c93',
             attributes={'key1': 'value1'},
-            start_time=datetime.datetime.utcnow().isoformat() + 'Z',
-            end_time=datetime.datetime.utcnow().isoformat() + 'Z',
+            start_time=utils.to_iso_str(),
+            end_time=utils.to_iso_str(),
             stack_trace=None,
             links=None,
             status=None,
-            time_events=None,
+            annotations=None,
+            message_events=None,
             same_process_as_parent_span=None,
             child_span_count=None,
             span_kind=0,
@@ -76,14 +79,21 @@ class TestSpanData(unittest.TestCase):
             span_id='6e0c63257de34c92',
             parent_span_id='6e0c63257de34c93',
             attributes={'key1': 'value1'},
-            start_time=datetime.datetime.utcnow().isoformat() + 'Z',
-            end_time=datetime.datetime.utcnow().isoformat() + 'Z',
+            start_time=utils.to_iso_str(),
+            end_time=utils.to_iso_str(),
             stack_trace=stack_trace.StackTrace(stack_trace_hash_id='111'),
             links=[link.Link('1111', span_id='6e0c63257de34c92')],
             status=status.Status(code=0, message='pok'),
-            time_events=[
-                time_event.TimeEvent(
-                    timestamp=datetime.datetime(1970, 1, 1)
+            annotations=[
+                time_event.Annotation(
+                    timestamp=datetime.datetime(1970, 1, 1),
+                    description='description'
+                )
+            ],
+            message_events=[
+                time_event.MessageEvent(
+                    timestamp=datetime.datetime(1970, 1, 1),
+                    id=0,
                 )
             ],
             same_process_as_parent_span=False,

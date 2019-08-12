@@ -18,9 +18,8 @@ import logging
 import re
 import six
 import random
-import time
 
-from opencensus.trace import trace_options
+from opencensus.trace import trace_options as trace_options_module
 
 _INVALID_TRACE_ID = '0' * 32
 INVALID_SPAN_ID = '0' * 16
@@ -28,11 +27,8 @@ INVALID_SPAN_ID = '0' * 16
 TRACE_ID_PATTERN = re.compile('[0-9a-f]{32}?')
 SPAN_ID_PATTERN = re.compile('[0-9a-f]{16}?')
 
-# Default options, enable tracing
-DEFAULT_OPTIONS = 1
-
-# Default trace options
-DEFAULT = trace_options.TraceOptions(DEFAULT_OPTIONS)
+# Default options, don't force sampling
+DEFAULT_OPTIONS = '0'
 
 
 class SpanContext(object):
@@ -66,7 +62,7 @@ class SpanContext(object):
             trace_id = generate_trace_id()
 
         if trace_options is None:
-            trace_options = DEFAULT
+            trace_options = trace_options_module.TraceOptions(DEFAULT_OPTIONS)
 
         self.from_header = from_header
         self.trace_id = self._check_trace_id(trace_id)
@@ -106,7 +102,7 @@ class SpanContext(object):
 
         if span_id is INVALID_SPAN_ID:
             logging.warning(
-                'Span_id {} is invalid (cannot be all zero)'.format(span_id))
+                'Span_id %s is invalid (cannot be all zero)', span_id)
             self.from_header = False
             return None
 
@@ -116,8 +112,8 @@ class SpanContext(object):
             return span_id
         else:
             logging.warning(
-                'Span_id {} does not the match the '
-                'required format'.format(span_id))
+                'Span_id %s does not the match the '
+                'required format', span_id)
             self.from_header = False
             return None
 
@@ -136,8 +132,8 @@ class SpanContext(object):
 
         if trace_id is _INVALID_TRACE_ID:
             logging.warning(
-                'Trace_id {} is invalid (cannot be all zero), '
-                'generating a new one.'.format(trace_id))
+                'Trace_id %s is invalid (cannot be all zero), '
+                'generating a new one.', trace_id)
             self.from_header = False
             return generate_trace_id()
 
@@ -147,8 +143,8 @@ class SpanContext(object):
             return trace_id
         else:
             logging.warning(
-                'Trace_id {} does not the match the required format,'
-                'generating a new one instead.'.format(trace_id))
+                'Trace_id %s does not the match the required format,'
+                'generating a new one instead.', trace_id)
             self.from_header = False
             return generate_trace_id()
 
@@ -164,12 +160,9 @@ def generate_span_id():
 
 
 def generate_trace_id():
-    """Generate a trace_id randomly. Must be a 32 character
-    hexadecimal encoded string
+    """Generate a random 32 char hex trace_id.
 
     :rtype: str
     :returns: 32 digit randomly generated hex trace id.
     """
-    t = int(time.time())
-    lower_96 = random.getrandbits(96)
-    return '{:032x}'.format((t << 96) | lower_96)
+    return '{:032x}'.format(random.getrandbits(128))
